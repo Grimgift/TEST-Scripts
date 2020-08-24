@@ -1,0 +1,481 @@
+key     Owner;
+key     Http_Request_id;
+
+integer Power;
+integer Wait;
+integer F_AAS = FALSE;
+
+integer gChannel_num;
+integer Listen;
+
+list    L_Script        = ["!0.HUD_Main","!1.A.A.S","!2.Attach"];
+list    L_Script_Reboot = ["!1.A.A.S"];
+
+string  Obj_Name = "Grim - HUD";
+string  Arrow = "HUD - Arrow";
+string  MainPanel = "HUD - Panel";
+
+string  Tex_Blank = "b1a3b1d8-736b-26cd-015e-a9e0c09d34ae";
+string  Arrow_Tex = "b4293985-bc19-c47a-cd81-1cd25063b30c";
+
+vector  Size_min = <0.01, 0.01, 0.01>;
+vector  Size_MP =  <0.01, 0.5, 0.28125>;
+vector  Pos_MP =   <0, -0.18, 0.23>;
+
+list    L_Button =      ["HUD - Profile","HUD - Reset","HUD - Dance","HUD - DanceStop",
+                         "HUD - A.A.S","HUD - Attache","HUD - PhotoStand"];
+                         
+list    L_Button_size = [<0.01, 0.1, 0.1>,<0.01, 0.03, 0.03>,<0.01, 0.05, 0.05>,<0.01, 0.04, 0.04>,
+                         <0.01, 0.05, 0.05>,<0.01, 0.05, 0.05>,<0.01, 0.05, 0.05>];
+                         
+list    L_Button_pos =  [<-0.02, -0.34075, 0.29050>,<-0.02, 0.0176, 0.1556>,<-0.02, -0.23236, 0.265>,<-0.02, -0.23236, 0.31969>,
+                         <-0.02, -0.16986, 0.265>,<-0.02, -0.23236, 0.2025>,<-0.02, -0.16986, 0.2025>];
+
+CreateIndex()
+{
+  integer i;
+  Link_Prims = ["root"];
+  integer nop = llGetNumberOfPrims();
+  for (i = 1; i <= nop; i++){
+    string linkPrim = llGetLinkName(i);
+    Link_Prims += [linkPrim];
+  }
+}
+
+integer GetIndex(string name)
+{
+  return llListFindList(Link_Prims,(list)name);
+}
+
+list    Link_Prims;
+
+Say(string str)
+{
+  llOwnerSay(str);
+}
+
+Size(integer num,vector size)
+{
+ llSetLinkPrimitiveParamsFast(0,[PRIM_LINK_TARGET,num,
+                                 PRIM_SIZE,size]);
+}
+
+Texture(integer num,integer face,string texture,vector repeats,vector offsets,float rot)
+{
+  float rad = rot * DEG_TO_RAD;
+  llSetLinkPrimitiveParamsFast(0,[PRIM_LINK_TARGET,num,
+                                  PRIM_TEXTURE,face,texture,repeats,offsets,rad]);
+}
+
+Lposition(integer num,vector xyz)
+{
+  vector p1 = llGetPos();
+  list p2 = llGetLinkPrimitiveParams(num,[PRIM_POS_LOCAL]);
+   
+  llSetLinkPrimitiveParamsFast(0,[PRIM_LINK_TARGET,num,
+                                  PRIM_POS_LOCAL,xyz]);
+}
+
+Lrotation(vector xyz,integer num)
+{
+  
+  list r3 = llGetLinkPrimitiveParams(num,[PRIM_ROT_LOCAL]);
+  rotation r1 = llList2Rot(r3,0);
+  Say((string)r3);
+  vector e_deg = xyz;
+  vector e_rad = e_deg * DEG_TO_RAD;
+  rotation r2 = llEuler2Rot(e_rad);
+          
+          llSetLinkPrimitiveParamsFast(0,[PRIM_LINK_TARGET,num,
+                                          PRIM_ROT_LOCAL, r1 / r2]);
+}
+
+SetBL1(list BListName)
+{    
+  integer a = 0;
+  integer BL_Length = llGetListLength(BListName);
+  for (a; a < BL_Length; a++){
+    Size(GetIndex(llList2String(BListName,a)),Size_min);
+    Lposition(GetIndex(llList2String(BListName,a)),<0.01,0,0>);
+    llSleep(0.01);
+  }
+}
+
+Set2BL(list BListName,list BListSize,list BListPos)
+{    
+  integer a;
+  integer BL_Length = llGetListLength(BListName);
+   
+  for (a = 0; a < BL_Length; a++){
+    Lposition(GetIndex(llList2String(BListName,a)),llList2Vector(BListPos,a));
+    Size(GetIndex(llList2String(BListName,a)),llList2Vector(BListSize,a));
+    llSleep(0.01);
+  }
+}
+
+GetImageURL(key UUID)
+{
+  string URL = "http://world.secondlife.com/resident/" + (string)UUID;
+  Http_Request_id = llHTTPRequest(URL,[HTTP_METHOD,"GET"],"");
+}
+
+SetImage(string body)
+{
+  string  Meta_string = "<meta name=\"imageid\" content=\"" ;
+  integer Meta_position = llSubStringIndex(body,Meta_string);
+  integer Meta_length = llStringLength(Meta_string);
+  integer UUID_length = 35 ;
+  string  Imageid = llGetSubString(body,Meta_position + Meta_length,Meta_position + Meta_length + UUID_length);
+  if ((key)Imageid != NULL_KEY){
+    Texture(GetIndex("HUD - Profile"),4,Imageid,<1.0, 1.0, 0.0>,<0.0, 0.0, 0.0>,0.0);
+  }
+  else{
+    Say("No Image");
+  }
+}
+
+integer Menu_Toggle1 = FALSE;
+integer Menu_Mode = 0;
+integer Stage = 0;
+integer Menu_Timer = 60;
+
+string  Others_Name;
+
+integer Menu_Button_Number = 9;
+string  Dialog_Text;
+
+list    Botton_Number_List = [];
+integer Dialogmenu_Number = 0;
+integer List_Contents_Number = 0;
+integer Max_Dialogmenu_Number = 0;
+
+list    ShortMenuForButtons = [];
+integer NumberOfCurrentDialogMenu = 0;
+integer NumberOfDetectedPeople = 0;
+integer Maximum_Number_Of_Menus = 0;
+
+integer NumberOfButtonsInTheMenu = 6;
+
+string  ListOfItemNamesInStringForm = "";
+
+list    parsedx = [];
+string  partA = "";
+string  partB = "";
+
+list    List_Template = [];
+list    List_Anim_Dance = ["200.Abusadamente 02","201.Anaconda 02 Clip","202.Chacal 06",
+                           "203.Fade 04","204.Malemolencia 02","205.Mambo 02",
+                           "206.Needed 02","207.Pony 03","208.Twice 04"];
+string  Anim_Dance_Temp;
+
+StopDance()
+{
+  integer a;
+  integer DL_Length = llGetListLength(List_Anim_Dance);
+   
+  for (a = 0; a < DL_Length; a++){
+    llStopAnimation(llList2String(List_Anim_Dance,a));
+    llSleep(0.01);
+  }
+}
+
+list order_buttons(list buttons) 
+{
+  return llList2List(buttons, -3, -1) + llList2List(buttons, -6, -4) +
+         llList2List(buttons, -9, -7) + llList2List(buttons, -12, -10);
+}
+
+SetShowMenu()
+{
+  List_Contents_Number = llGetListLength(List_Template);
+  
+  Max_Dialogmenu_Number = llFloor(List_Contents_Number / Menu_Button_Number);
+  Maximum_Number_Of_Menus = llFloor(NumberOfDetectedPeople / NumberOfButtonsInTheMenu);
+  
+  if (List_Contents_Number % Menu_Button_Number == 0)
+    Max_Dialogmenu_Number--;
+      
+  Dialogmenu_Number = 0;  
+}
+
+ShowMenu()
+{
+  Botton_Number_List = [];
+  Dialog_Text = "";
+   
+  integer i;
+
+  for (i = 0; i < (Menu_Button_Number); i++){
+    if (llList2String(List_Template,Dialogmenu_Number * Menu_Button_Number + i) != ""){
+      Botton_Number_List += "No." + (string)(Dialogmenu_Number * Menu_Button_Number + i);
+      Dialog_Text += "\n" + (string)(Dialogmenu_Number * Menu_Button_Number + i) + " " +
+      llList2String(List_Template,Dialogmenu_Number * Menu_Button_Number + i);
+    }
+  }
+
+  Botton_Number_List += "<---";
+  Botton_Number_List += "キャンセル";
+  Botton_Number_List += "--->";
+  
+  llDialog(Owner,
+           "メニュー受付時間 " + (string)Menu_Timer + "秒" + "\n" +
+           "現在のページ　" + (string)(Dialogmenu_Number + 1) + "/" + (string)(Max_Dialogmenu_Number + 1) + "\n" + 
+           Dialog_Text,
+           order_buttons(Botton_Number_List),gChannel_num);
+}
+
+reset2()
+{
+  llSetTimerEvent(0);
+  Menu_Toggle1 = FALSE;
+  Menu_Mode = 0;
+}
+
+default
+{
+    attach(key id)
+    {
+      if (llGetAttached() != 0){
+        llResetScript();
+      }
+    }
+    
+    state_entry()
+    {
+      Say("Grim - HUD　動作ロード開始");
+      Power = FALSE;
+      llSetStatus(STATUS_BLOCK_GRAB_OBJECT,FALSE);
+      Owner = llGetOwner();
+      llSetObjectName(Obj_Name);
+      CreateIndex();
+      llSleep(0.1);
+      Texture(GetIndex(Arrow),4,Arrow_Tex,<1.0, 0.5, 0.0>,<0.0, 0.0, 0.0>,180);
+      Size(GetIndex(MainPanel),Size_min);
+      Lposition(GetIndex(MainPanel),<0,0,0>);
+      
+      llSleep(0.1);
+      
+      SetBL1(L_Button);
+      
+      llSleep(0.1);
+      
+      Texture(GetIndex("HUD - Profile"),4,Tex_Blank,<1.0, 1.0, 0.0>,<0.0, 0.0, 0.0>,0.0);
+       
+      integer i;
+      integer a = llGetListLength(L_Script_Reboot );
+      llSleep(0.1);
+      for (i =0; i < a ; i++){
+        string b = llList2String(L_Script_Reboot,i);
+        integer c = llGetScriptState(b);
+        if (c == TRUE){
+          llSetScriptState(b,FALSE);
+          llSleep(1.0);
+        }
+      }
+      
+      if (llGetAttached() != 0){
+        gChannel_num = -1 - (integer)("0x" + llGetSubString((string)llGetOwner(),-7,-1)) + 1000;
+        llRequestPermissions(Owner,PERMISSION_TAKE_CONTROLS | PERMISSION_TRIGGER_ANIMATION);
+      }
+    }
+    
+    run_time_permissions(integer perm)
+    {
+      if (perm & PERMISSION_TAKE_CONTROLS | PERMISSION_TRIGGER_ANIMATION){
+        llTakeControls(-1,FALSE,FALSE);
+        StopDance();
+        GetImageURL(Owner);
+      }
+    }
+    
+    http_response(key request_id, integer status, list metadata, string body)
+    { 
+      if (status == 200){
+        SetImage(body);
+      }
+      integer  Use_Memory = llGetUsedMemory();
+      integer  Free_Memory = llGetFreeMemory();
+      Say("Grim - HUD　動作ロード完了" + "\n" +
+          "使用チャンネル " + (string)gChannel_num  + "\n" +
+          "使用メモリ " + (string)Use_Memory + "KB" + "\n" +
+          "空きメモリ " + (string)Free_Memory + "KB");
+      llSleep(1.0);
+      state off;
+    }
+    
+    changed(integer change)
+    {
+      if (change & (CHANGED_OWNER | CHANGED_LINK))
+        llResetScript();
+    }
+}
+
+state off
+{
+    state_entry()
+    {
+      llListenRemove(Listen);
+      llSay(gChannel_num,"Tail - Default");
+      if (Anim_Dance_Temp!= ""){
+        llStopAnimation(Anim_Dance_Temp);
+      }
+    }
+    
+    touch_start(integer total_number)
+    {
+      if (llDetectedKey(0) == Owner){
+        if (llDetectedLinkNumber(0) == GetIndex(Arrow) && Power == FALSE){
+          Power = TRUE;
+          
+          Texture(GetIndex(Arrow),4,Arrow_Tex,<1.0, 0.5, 0.0>,<0.0, 0.0, 0.0>,0);
+          Lposition(GetIndex(MainPanel),Pos_MP);
+          Size(GetIndex(MainPanel),Size_MP);
+          
+          llSleep(0.1);
+          
+          Set2BL(L_Button,L_Button_size,L_Button_pos);
+          
+          state on;
+        }
+      }
+    }
+    
+    link_message(integer sender_num, integer num, string str, key id)
+    {
+    }
+    
+    changed(integer change)
+    {
+      if (change & (CHANGED_OWNER | CHANGED_LINK))
+        llResetScript();
+    }
+}
+
+state on
+{
+    state_entry()
+    {
+      Listen = llListen(gChannel_num,"","","");
+    }
+    
+    touch_start(integer total_number)
+    {
+      if (llDetectedKey(0) == Owner){
+        if (llDetectedLinkNumber(0) == GetIndex(Arrow) && Power == TRUE){
+          Power = FALSE;
+          
+          Texture(GetIndex(Arrow),4,Arrow_Tex,<1.0, 0.5, 0.0>,<0.0, 0.0, 0.0>,180);
+          Size(GetIndex(MainPanel),Size_min);
+          Lposition(GetIndex(MainPanel),<0,0,0>);
+          
+          llSleep(0.1);
+          SetBL1(L_Button);
+          
+          state off;
+        }
+        
+        if (llDetectedLinkNumber(0) == GetIndex("HUD - Profile")){
+          GetImageURL(Owner);
+        }
+        if (llDetectedLinkNumber(0) == GetIndex("HUD - Reset")){
+          Say("リセットボタンが押されたためスクリプトをリセットします");
+          llSleep(0.1);
+          llResetScript();
+        }
+        if (llDetectedLinkNumber(0) == GetIndex("HUD - Dance")){
+          llMessageLinked(LINK_SET,200,"",NULL_KEY);
+        }
+        if (llDetectedLinkNumber(0) == GetIndex("HUD - DanceStop")){
+          if (Anim_Dance_Temp!= ""){
+            llStopAnimation(Anim_Dance_Temp);
+            llSay(gChannel_num,"Tail - Default"); 
+          }
+        }
+        if (llDetectedLinkNumber(0) == GetIndex("HUD - A.A.S")){
+          if (F_AAS == FALSE){
+            F_AAS = TRUE;
+            llSetScriptState(llList2String(L_Script,1),TRUE);
+            llSleep(0.1);
+            llMessageLinked(LINK_SET,300,"",NULL_KEY);
+          }
+        }
+        if (llDetectedLinkNumber(0) == GetIndex("HUD - Attache")){
+          llMessageLinked(LINK_SET,400,"",NULL_KEY);
+        }
+      }
+    }
+    
+    link_message(integer sender_num, integer num, string str, key id)
+    {
+      if (num == 200){
+        Menu_Toggle1 = TRUE;
+        
+        List_Template = [];
+        llSleep(0.1);
+        List_Template = llListInsertList(List_Template,List_Anim_Dance,0);
+        SetShowMenu();
+        ShowMenu(); 
+
+        llSetTimerEvent(Menu_Timer);
+      }
+      
+      if (num == 301){
+        llResetOtherScript(llList2String(L_Script,1));
+        llSleep(1.0);
+        llSetScriptState(llList2String(L_Script,1),FALSE);
+        F_AAS = FALSE;
+      }
+      
+      if (num == 401){
+      }
+    }
+    
+    listen(integer channel, string name, key id, string message)
+    {
+      if (channel == gChannel_num && Owner == llGetOwnerKey(id)){
+        parsedx = llParseString2List(message,["."],[]);
+        partA = llList2String(parsedx,0);
+        partB = llList2String(parsedx,1);
+        
+        if (message == "キャンセル" || message == "---"){
+          reset2();
+          return;
+        }
+        
+        if (partA == "No"){
+          if (Anim_Dance_Temp!= ""){
+            llStopAnimation(Anim_Dance_Temp);
+            llSay(gChannel_num,"Tail - Default");
+          }
+          Anim_Dance_Temp = llList2String(List_Template,(integer)partB);
+          integer ai = llGetAgentInfo(Owner);
+          if (!(ai & AGENT_ON_OBJECT)){
+            llStartAnimation(Anim_Dance_Temp);
+            llSay(gChannel_num,"Tail - Bounce Fast");
+          }
+          reset2();
+        }
+        if (message == "DanceStop"){
+          llStopAnimation(Anim_Dance_Temp);
+          llSay(gChannel_num,"Tail - Default");     
+        }
+      }
+    }
+    
+    http_response(key request_id, integer status, list metadata, string body)
+    { 
+      if (status == 200){ 
+        SetImage(body);
+      }
+    }
+    
+    timer()
+    {
+    }
+    
+    changed(integer change)
+    {
+      if (change & (CHANGED_OWNER | CHANGED_LINK))
+        llResetScript();
+    } 
+}
